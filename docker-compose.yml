@@ -1,5 +1,5 @@
 services:
-  app-csv:
+  my-movies-api:
     build:
       context: .
       dockerfile: Dockerfile
