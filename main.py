@@ -1,6 +1,11 @@
-from fastapi import FastAPI, Body, Path, Query, status
+from typing import Any, Coroutine, Optional
+from fastapi import FastAPI, Body, Path, Query, status, Request, HTTPException, Depends
 from fastapi.responses import HTMLResponse, JSONResponse
+from starlette.requests import Request
 from schemas.movie import Movie
+from jwt_manager import create_token, validate_token
+from schemas.user import User
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 
 
@@ -28,12 +33,33 @@ movies = [
     }
 ]
 
+class JWTBearer(HTTPBearer):
+    async def __call__(self, request: Request):
+        auth =  await super().__call__(request)
+        data = validate_token(auth.credentials)
+        if data['email'] != "admin@mail.com":
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid user")
+        
+#================================================
+# login 
+
+@app.post('/login', tags=['auth'])
+def login(user : User):
+    if user.email == "admin@mail.com" and user.password == "admin":
+        token = create_token(user.model_dump())
+        return JSONResponse(content={'token': token}, status_code=200)
+    return JSONResponse(content={'message': 'Invalid credentials'}, status_code=401)
+
+#================================================
+
+
+
     
 @app.get('/', tags=['home'])
 def message():
     return HTMLResponse('<h1> hello </h1>')
 
-@app.get('/movies', tags=['movies'], response_model=list[Movie])
+@app.get('/movies', tags=['movies'], response_model=list[Movie], dependencies=[Depends(JWTBearer)])
 def get_movies() -> list[Movie]:
 
     return JSONResponse(content=movies, status_code=status.HTTP_200_OK)
